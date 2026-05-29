@@ -4,90 +4,73 @@ Um DICOM-Dateien anzeigen zu können, müssen wir sie zunächst einlesen können
 
 ## Projektsetup
 
-Bei dem DICOM-Format handelt es sich um ein komplexes Containerformat für Bilddateien (ein Überblick ist z.B. [hier](http://dicom.nema.org/medical/dicom/current/output/chtml/part10/chapter_7.html) zu finden). Um ein solch komplexes Dateiformat einzulesen, bietet sich die Verwendung einer existierenden Bibliothek an - in diesem Fall [dcm4che](https://www.dcm4che.org/). Um diese Bibliothek zu verwenden, müssen zunächst ein paar Einstellungen vorgenommen werden. Nehmen Sie diese bitte für ein besseres Verständnis selber vor - sie sind in der Aufgabenstellung noch nicht vorhanden!
+Bei dem DICOM-Format handelt es sich um ein komplexes Containerformat für Bilddateien (ein Überblick ist z.B. [hier](http://dicom.nema.org/medical/dicom/current/output/chtml/part10/chapter_7.html) zu finden). Um ein solch komplexes Dateiformat einzulesen, bietet sich die Verwendung einer existierenden Bibliothek an - in diesem Fall [das pixelmed DICOM-Toolkit](https://www.pixelmed.com/dicomtoolkit.html). Schauen Sie bitte zunächst in die build.gradle, um sich damit vertraut zu machen.
 
-### Maven-Module in build.gradle
-
-In build.gradle finden Sie einen Bereich, in dem die verwendeten maven-Repositories definiert sind:
+Das DICOM-Toolkit ist im [Maven-Repository](https://mvnrepository.com/artifact/com.pixelmed/dicom) zu finden. Wir verwenden die Version [20120929](https://mvnrepository.com/artifact/com.pixelmed/dicom/20120929). Auf dieser Seite ist unten der Verweis zu finden, dass sich das Artefakt im Gazelle-Repository befindet. Entsprechend muss die repositories-Liste in build.gradle wie folgt angepasst werden:
 
 ```java
-repositories{
+repositories {
     mavenCentral()
+    maven{
+        url "https://gazelle.ihe.net/nexus/content/repositories/releases/"
+    }
 }
 ```
 
-In diesem Beispiel wird nur das mavenCentral-Plugin von Gradle verwendet, über welches das [entsprechende bei apache.org gehostete repository](https://repo.maven.apache.org/maven2/) eingebunden wird. Viele Pakete werden aber über eigene repositories angeboten, insbesondere größere Bilbiotheken hosten häufig ihre eigenen maven-repositories. Solche repositories können wie folgt eingebunden werden:
+Die Zeile, welche in den dependencies-Bereich eingefügt werden muss, um das Artefakt in dem Projekt zu verwenden, steht im "gradle"-Tab auf der selben Webseite. Angepasst sehen unsere Dependencies nun wie folgt aus:
 
 ```java
-repositories{
-    mavenCentral()
-    maven{
-        url "http://repo1.com/maven2/"
-    }
-    maven{
-        url "https://repo2.org/maven2/"
-    }
-    ...
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'com.pixelmed:dicom:20120929'
 }
 ```
 
-Für das aktuelle Projekt werden die folgenden Module (zu definieren wie gewohnt in build.gradle unter dependencies) benötigt:
-
-* org.dcm4che:dcm4che-core:5.23.1
-* org.dcm4che:dcm4che-image:5.23.1
-* org.dcm4che:dcm4che-imageio:5.23.1
-* org.dcm4che:dcm4che-imageio-rle:5.23.1
-* org.dcm4che:dcm4che-imageio-opencv:5.23.1
-
-Diese Module und ihre Abhängigkeiten sind in den folgenden maven-repositories zu finden:
-
-* https://www.dcm4che.org/maven2/
-* https://raw.github.com/nroduit/mvn-repo/master/
-
-### Native Bibliotheken
-
-Für das Einlesen der in den DICOM-Dateien enthaltenen Bilddaten in diversen Formaten gibt es leider keine reinen Java-Pakete. Stattdessen wird die native [Open Computer Vision (OpenCV)-Bibliothek](https://opencv.org/) benötigt. Vorkompilierte und mit der jeweiligen dmc4che3-Version kompatible Versionen dieser Bibliothek finden sich in dem jeweiligen [binary distribution package von dcm4che](https://github.com/dcm4che/dcm4che/releases). In der dort verfügbaren zip-Datei (achten Sie beim Download darauf, die selbe Version zu verwenden, wie in den oben genannten dcm4che-Modulen) befindet sich ein Ordner "lib" mit Unterordnern für unterschiedliche Betriebssysteme. Sie benötigen alle in dem für Ihr Betriebssystem relevanten Unterordner vorhandenen .dll/.so/.jnilib-Dateien. Kopieren Sie diese in das lib-Verzeichnis des Projekts (aber fügen Sie sie bitte nicht zum git-repo hinzu). Sie müssen dann nur noch das Projekt so konfigurieren, dass diese Bibliotheken als Teil des library paths (eine Liste aller Verzeichnisse, in denen nach nativen Bibliotheken gesucht wird, falls eine solche geladen werden muss) gesehen werden. Dafür können Sie in gradle den run-Eintrag um folgende Zeile erweitern:
-
-```java
-    systemProperty "java.library.path", 'lib'
-```
-
-Nach diesen Anpassungen müssten Sie die dcm4che-Bibliothek in Ihrem Java-Projekt verwenden können.
+## Hintergrundinformationen: DICOM-Format
 
 ## Einlesen von DICOM-Dateien
 
-### Hintergrundinformationen
-
-#### dcm4che für DICOM-Dateien
-
-Der folgende Codeabschnitt zeigt Ihnen, wie die Bilddaten aus einer DICOM-Datei eingelesen werden können:
+Der folgende Codeabschnitt zeigt Ihnen, wie die Bilddaten aus einer DICOM-Datei eingelesen werden können (Sie können Beispiele auch selber ergoogeln, beispielsweise [dieses Tutorial](https://saravanansubramanian.com/blog/extractdicomimagedata/)):
 
 ```java
+import com.pixelmed.dicom.AttributeList;
+import com.pixelmed.display.SourceImage;
+
 import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 
 public class DICOMTest {
     public static void main(String[] args) {
-        ImageIO.scanForPlugins();
-        ImageReader ir = ImageIO.getImageReadersByFormatName("DICOM").next();
-        DicomImageReadParam param = (DicomImageReadParam) ir.getDefaultReadParam();
-        ImageInputStream iis = ImageIO.createImageInputStream(new File("data/angiogram1.DCM"));
-        ir.setInput(iis);
-        BufferedImage image = ir.read(1, param);
+        String infilename = "data/angiogram1.DCM";
+        BufferedImage image = null;
+        try {
+            AttributeList fileattributes = new AttributeList();
+            // Metadaten der Datei einlesen
+            fileattributes.read(infilename);
+            // Bilddaten einlesen
+            SourceImage dcImage = new SourceImage(fileattributes);
+            // Bild 4 aus Bilddaten in BufferedImage einlesen
+            image = dcImage.getBufferedImage(4);
+        } catch (Exception e) {
+            System.out.println("Error reading image file: " + e.getMessage());
+        }
+        try {
+            ImageIO.write(image, "png", new File("frame4.png"));
+        } catch (IOException e) {
+            System.out.println("Error writing png file: " + e.getMessage());
+        }
+
     }
 }
 ```
 
-Zunächst wird die ImageIO-Bibliothek angewiesen, nach plugins für Dateiformate zu suchen. Dabei wird die im classpath vorhandene dcm4che-Bibliothek gefunden und für das DICOM-Format registriert. Der entsprechenden ImageReader (eine abstrakte Klasse, die von allen ImageIO-Plugins implementiert werden muss) wird in der nächsten Zeile erstellt. Danach wird ein Objekt mit Standard-Parametern für das Einlesen von DICOM-Bildern erstellt - hier brauchen wir uns um keine Details kümmern, diese Standardparameter funktionieren für Standard-Anwendungsfälle hervorragend. 
+Diesen Code finden Sie auch zum selber-ausprobieren in der Klasse `DICOMTest`.
 
-Die nächsten beiden Zeilen erstellen einen InputStream für die Bilddatei - das ist wieder eine abstrakte Klasse, die verwendet werden kann, um Leseoperationen auf unterschiedlichen Datentypen zu implementieren, die zwar alle in irgendeiner Art Daten lesen und zur Verfügung stellen, aber beispielsweise unterschiedliche Sprung- und Suchoperationen zur Verfügung stellen können (z. B. im Fall von DICOM-Dateien das Springen zwischen unterschiedlichen Einträgen in der Datei). 
-
-Abschließend wird das erste Bild aus der DICOM-Datei in ein BufferedImage eingelesen. Der erste Parameter in ```ir.read(1, param)``` zeigt an, welches der Bilder aus der Bildfolge eingelesen werden soll. Die frames sind aufsteigend lückenlos durchnummeriert, wie in einem Array. Wird versucht, ein frame einzulesen, das nicht vorhanden ist (also ein Index < 0 oder > Anzahl der vorhandenen frames), so wirft die read-Methode eine ```IndexOutOfBoundsException```.
-
-#### Kantendetektion mit dem Sobel-Filter
+### Kantendetektion mit dem Sobel-Filter
 
 Neben dem Einlesen von DICOM-Dateien soll auch eine Kantendetektion zur Unterstützung der Diagnostik stattfinden. Dafür verwenden wir einen einfachen Filter, den Sobel-Operator. Dieser addiert und subtrahiert die Werte der direkt über/unter (für die Detektion horizontaler Kanten) bzw. neben (für die Detektion vertikaler Kanten) einem Pixel liegenden Pixel so, dass sich bei starken Veränderungen der Frabintensität große Werte ergeben. Auf Flächen mit ungefähr gleichbleibender Intensität löschen sich hingegen die Werte der umliegenden Pixel aus.
 
@@ -125,7 +108,7 @@ Bitte beachten Sie ein paar Implementationsdetails:
 * Die Kantendetektion wird auf Grauwerten durchgeführt, Sie müssen Pixel von Farbbildern also zunächst in Grauwerte umrechnen. Der empfundene Grauwert eines RGB-Wertes kann nach der Formel: ```Grauwert = 0.2126*Rotwert + 0.7152*Grünwert + 0.0722*Blauwert``` berechnet werden. Hintegrund ist das durch die unterschiedlichen Rezeptoren im menschlichen Auge hervorgerufene Helligkeitsempfinden.  
 * Sie werden für die Implementation der Kantendetektion als Ergebnis ein Bild im Farbmodus ```BufferedImage.TYPE_BYTE_GRAY``` verwenden, die dort gespeicherten Pixelwerte können also maximal 255 sein. Das Quellbild wird in der Regel ein volles RGB-Bild mit integer-Werten für die Pixel sein, also können die berechneten Kantenwerte viel größer als 255 werden. Sie sollten sich also bei der Berechnung den maximalen berechneten Farbwert merken und diesen nutzen, um alle Werte auf maximal 255 zu skalieren (also mit dem Skalierungsfaktor ```scale = 255/maxValue``` zu multiplizieren) 
 
-### DICOMImage: Verwaltung eines DICOM-Bildes
+## DICOMImage: Verwaltung eines DICOM-Bildes
 
 Implementieren Sie mit diesem Wissen eine Klasse ```DICOMImage```, die alle Frames eines DICOM-Bildes einliest und verwaltet. Lesen Sie bitte zunächst die Aufgabe bis zum Ende: Es ist sehr empfehlenswert, die Implementation nicht stur in dieser Reihenfolge durchzuführen, sonder stückweise ```DICOMImage``` und ```DICOMFrame``` parallel zu implementieren, so dass man immer testen kann, ob die bisher implementierte Funktionalität auch korrekt ist.
 
@@ -146,14 +129,6 @@ Es bietet sich zudem an, mindestens die folgenden Hilfsmethoden zu verwenden:
 * ```private void detectEdges()```: Führt die Kantendetektion mit dem letzten angegebenen Skalierungsfaktor durch (den Sie sich ja in ```getEdges``` sowieso merken müssen) und speichert das Ergebnis in einem ```BufferedImage``` (welches Sie dann in ```getEdges``` zurückgeben können).
 * ```private int getGrayscalePixel(BufferedImage image, int x, int y)```: Gibt den Pixel an den Koordinaten ```x``` und ```y``` im Bild ```image``` als Grauwert zurück. Der empfundene Grauwert eines RGB-Wertes kann nach der Formel: ```Grauwert = 0.2126*Rotwert + 0.7152*Grünwert + 0.0722*Blauwert``` berechnet werden. Hintegrund ist das durch die unterschiedlichen Rezeptoren im menschlichen Auge hervorgerufene Helligkeitsempfinden.
 
-### DICOMDiagnostics
+## DICOMDiagnostics
 
 Implementieren Sie zuletzt eine Main-Klasse ```DICOMDiagnostics```, die nur die Datei ```data/angiogram1.DCM``` als ein ```DICOMImage``` einliest und von einem frame Ihrer Wahl sowohl das Originalbild als auch das Ergebnis der Kantendetektion mit einer brightness Ihrer Wahl (es sollten aber Kanten darauf erkennbar sein - und zwar von den Blutgefäßen, nicht einfach nur die umlaufende Kante des Bildes) ausgibt.
-
-Da automatische Tests mit nativen Bibliotheken schwer umzusetzen sind, wenn die Entwicklung mit unterschiedlichen Systemen stattfindet, und ich Ihnen wieder lauter Testfehler ersparen möchte, ersetzen Sie bitte wieder einfach die zwei Bilder ```Aufgabe1_frame.png``` sowie ```Aufgabe1_edge.png``` im Verzeichnis ```Bilder``` durch die Ausgaben Ihres Programms. Sie sollten dann hier erscheinen:
-
-Frame:
-![Frame](Bilder/Aufgabe1_frame.png)
-
-Edge:
-![Edge](Bilder/Aufgabe1_edge.png)

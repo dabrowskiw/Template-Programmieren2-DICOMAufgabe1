@@ -11,6 +11,7 @@ public class DICOMFrame {
     }
 
     private int getGrayscalePixel(BufferedImage image, int x, int y) {
+        return 0;
     }
 
     private void detectEdges() {
