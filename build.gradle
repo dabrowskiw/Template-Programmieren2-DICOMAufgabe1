@@ -3,9 +3,14 @@ plugins {
     id 'application'
 }
 
-mainClassName = 'org.htw.prog2.aufgabe2.DICOMDiagnostics'
+application {
+    mainClass = 'org.htw.prog2.aufgabe2.DICOMDiagnostics'
+}
 
-run {
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 tasks.withType(JavaCompile) {
@@ -17,6 +22,9 @@ version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+    maven{
+        url "https://gazelle.ihe.net/nexus/content/repositories/releases/"
+    }
 }
 
 test{
@@ -37,6 +45,7 @@ sourceSets {
 }
 
 dependencies {
+    implementation 'com.pixelmed:dicom:20120929'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
 }
